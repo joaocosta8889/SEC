@@ -59,21 +59,24 @@ public class FSLibrary {
 		
 		boolean ack = block_service.storePubKey(cert);
 		
-		if(!ack) {
-			throw new CertificateException("[ ERROR: Storing Cerificate Failed! ]");
-		} else {
-			System.out.println("[ Inicialization Complete! ]");
-		}
-		
+		if(ack) {
+			System.out.println("Welcome new client!");
+			System.out.println("Your publiv key is now stored at the server, and available to every reader.");
+		} 
+			
+		System.out.println("[ Inicialization Complete! ]");	
 	}
 	
 	public PublicKey FS_write(int pos, int size, byte[] contents) throws RemoteException, CertificateException, PKCS11Exception, InvalidKeyException, NoSuchAlgorithmException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchMethodException, SecurityException, SignatureException {
 		
+		System.out.println("[ Writing Data...]");
 		Data cont = new Data(size, pos, contents);
 		
 		byte[] signature = makeSignature(contents);
 		X509Certificate cert = getCertificate(getCertificateBytes(0));
 		this.block_service.put_k(cont, signature, cert.getPublicKey());
+		
+		System.out.println("[ Writing Complete ]");
 		
 		return cert.getPublicKey();
 		
@@ -94,6 +97,12 @@ public class FSLibrary {
 	
 	public List<PublicKey> FS_list() throws RemoteException {
 		return  block_service.readPubKeys();
+	}
+	
+	public void FS_exit() throws PteidException {
+		 System.out.println("[ Exiting...]");
+		 pteid.Exit(pteid.PTEID_EXIT_LEAVE_CARD);
+		 System.out.println("We hope to see you again!");
 	}
 	
 	private void init_pteid() throws PteidException {

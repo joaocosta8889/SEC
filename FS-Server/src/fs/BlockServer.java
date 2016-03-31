@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+
+import static javax.xml.bind.DatatypeConverter.printHexBinary;
+
 public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	
 	private static final long serialVersionUID = 1L;
@@ -35,11 +38,11 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	
 	@Override
 	public byte[] get(PublicKey id) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
-		 
+		
 		if(blocks.containsKey(id)) {
 			byte[] data = blocks.get(id).getBlockContent();
 			byte[] signature = blocks.get(id).getSignature();	
-			
+					
 			boolean signed = verifySignature(data, signature, id);
 			if(signed) {
 				return data;
@@ -56,11 +59,14 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 
 		boolean signed = verifySignature(data.getDataContent(), signature, id);
 		
-		if(signed) {	
+		if(signed) {
+			
 			if(blocks.containsKey(id)) {
 				blocks.get(id).setBlockContent(data, signature);
 			} else {
-				throw new IllegalArgumentException("[ SERVER ERROR: Invalid ID ]");
+				Block new_block = new Block();
+				blocks.put(id, new_block);
+				blocks.get(id).setBlockContent(data, signature);
 			}
 		} else {
 			throw new SignatureException("[ Security ERROR: Authentication Failed! ]");
@@ -70,18 +76,12 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	@Override
 	public boolean storePubKey(X509Certificate cert) throws RemoteException {
 
-		this.certificates.add(cert);
-		
-		PublicKey id = cert.getPublicKey();
-		
-		if (blocks.containsKey(id)){	
-			return false;
+		if(!certificates.contains(cert)) {
+			this.certificates.add(cert);
+			return true;
 		}
-		
-		Block newBlock = new Block();
-		blocks.put(id, newBlock);
 
-		return true;
+		return false;
 	}
 
 	@Override
