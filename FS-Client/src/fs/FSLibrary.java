@@ -3,10 +3,17 @@ package fs;
 import pteidlib.PTEID_Certif;
 import pteidlib.PteidException;
 import pteidlib.pteid;
+import sun.security.pkcs11.wrapper.CK_ATTRIBUTE;
+import sun.security.pkcs11.wrapper.CK_C_INITIALIZE_ARGS;
+import sun.security.pkcs11.wrapper.CK_MECHANISM;
+import sun.security.pkcs11.wrapper.PKCS11;
+import sun.security.pkcs11.wrapper.PKCS11Constants;
+import sun.security.pkcs11.wrapper.PKCS11Exception;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -48,13 +55,13 @@ public class FSLibrary {
 		block_service.storePubKey(cert);
 	}
 	
-	public PublicKey FS_write(int pos, int syze, byte[] contents) throws InvalidKeyException, RemoteException, SignatureException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, CertificateException {
+	public PublicKey FS_write(int pos, int syze, byte[] contents) throws InvalidKeyException, RemoteException, SignatureException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, CertificateException, ClassNotFoundException, NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, PKCS11Exception {
 		
 		Data cont = new Data(syze, pos, contents);
 		
 		byte[] signature = makeSignature(contents);
 		X509Certificate cert = getCertificate(getCertificateBytes(0));
-		this.block_service.put_k(contents, signature, cert.getPublicKey());
+		this.block_service.put_k(cont, signature, cert.getPublicKey());
 		
 		return cert.getPublicKey();
 		
