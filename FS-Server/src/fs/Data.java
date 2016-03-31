@@ -23,9 +23,4 @@ public class Data{
     public byte[] getDataContent() {
         return content;
     }
- 
-/*
-    public String toString() {
-        return "Data{" + "dataSize=" + dataSize + ", pos=" + pos + ", conteudo=" + new String( conteudo )+ '}';
-    }*/
 }

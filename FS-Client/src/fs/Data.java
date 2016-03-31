@@ -17,21 +17,4 @@ public class Data{
         this.pos = pos;
         this.content = null;
     }
-/*
-    public int getDataSize() {
-        return dataSize;
-    }
-
-    public int getDataPos() {
-        return pos;
-    }
-
-    public byte[] getDataContent() {
-        return content;
-    }
- 
-/*
-    public String toString() {
-        return "Data{" + "dataSize=" + dataSize + ", pos=" + pos + ", conteudo=" + new String( conteudo )+ '}';
-    }*/
 }
