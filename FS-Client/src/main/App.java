@@ -1,35 +1,32 @@
 package main;
 
+import java.security.PublicKey;
 import java.security.SignatureException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static javax.xml.bind.DatatypeConverter.printHexBinary;
 
 import fs.FSLibrary;
 
 public class App {
-/*
-	public static void main(String[] args) throws Exception {
 
+	public static void main(String[] args) throws Exception {
+		
 		FSLibrary client1 = new FSLibrary();
 		client1.FS_init();
 		
-		String plainText = "This is a test";
-		System.out.println("Text: " + plainText);
+		String text = "data...data...data";
+		client1.FS_write(0, text.length(), text.getBytes());
 		
-		System.out.println("Writing...");
-		try {
-			client1.FS_write(0, 14,plainText.getBytes());
-		} catch (SignatureException e) {
-			e.getMessage();
-		}
-		System.out.println("Writing Complete!");
+		FSLibrary client2 = new FSLibrary();
+		client2.FS_init();
 		
-		System.out.println("Reading...");
-		try {
-			byte[] contents_read = client1.FS_read(client1.getId(),0 ,14);
-			System.out.println("Contents Read: " + new String(contents_read));
-		} catch (IllegalArgumentException e) {
-			e.getMessage();
-		}
-				
-	}*/
+		
+		List<PublicKey> keys = client2.FS_list();
+		byte[] data_read = client2.FS_read(keys.get(0), 0, text.length());
+		System.out.println(new String(data_read));
+		
+	}
 	
 }

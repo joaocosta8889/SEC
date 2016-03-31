@@ -8,7 +8,7 @@ public class TestBlock {
 	public static void main(String[] args) throws Exception {
 		
 		// Para experimentar, tornar metodo writeBlock na classe Block private e descomentar o codigo abaixo
-		/*
+		
 		byte[] firstEx = "Rui".getBytes();
 		byte[] secondEx = "Peresidente".getBytes();
 		
@@ -39,7 +39,7 @@ public class TestBlock {
 		for(int i= 0; i < b1cont.length; i++) {
 			System.out.println("" + b1cont[i]);
 		}
-		*/
+		
 	}
 
 }
