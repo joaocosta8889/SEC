@@ -1,1 +1,5 @@
 /bin/
+/FS-Client/bin/
+/FS-Server/bin/
+/FS-Client/.classpath/
+/FS-Server/.classpath/
