@@ -1,8 +1,12 @@
 package fs;
 
-public class Data{
+import java.io.Serializable;
+
+public class Data implements Serializable {
      
-    private int dataSize;
+	private static final long serialVersionUID = 1L;
+	
+	private int dataSize;
     private int pos;
     private byte[] content;
 
@@ -16,5 +20,17 @@ public class Data{
         this.dataSize = dataSize;
         this.pos = pos;
         this.content = null;
+    }
+
+    public int getDataSize() {
+        return dataSize;
+    }
+
+    public int getDataPos() {
+        return pos;
+    }
+
+    public byte[] getDataContent() {
+        return content;
     }
 }
