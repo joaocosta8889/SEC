@@ -7,7 +7,7 @@ public class Block {
 	private byte[] content;
 	private byte[] signature;
 	
-	public Block(Data data, byte[] signature, PublicKey public_key) {
+	public Block(Data data, byte[] signature) {
 		
 		this.content = writeBlock(data);
 		this.signature = signature;
@@ -39,11 +39,11 @@ public class Block {
 		byte[] newContent = null;
 		byte[] toWrite = cont.getDataContent();
 		
-		if((cont.getDataPos() + cont.getDataSize()) < this.content.length){
+		if((cont.getDataPos() + cont.getDataSize()) > this.content.length){
 			// cria um novo vetor e vai copiar conteudo
 			int contSize = this.content.length;
-			int newSize =  contSize + (contSize - (cont.getDataPos() + cont.getDataSize()));
-			
+			//int newSize =  contSize + ((cont.getDataPos() + cont.getDataSize()) - contSize);
+			int newSize =  contSize + (cont.getDataPos() + cont.getDataSize());
 			newContent = new byte[newSize];
 			
 			// copia conteudo antigo
@@ -66,3 +66,5 @@ public class Block {
 		return newContent;
 	}
 }
+
+

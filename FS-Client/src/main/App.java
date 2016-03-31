@@ -5,9 +5,9 @@ import java.security.SignatureException;
 import fs.FSLibrary;
 
 public class App {
-
+/*
 	public static void main(String[] args) throws Exception {
-		
+
 		FSLibrary client1 = new FSLibrary();
 		client1.FS_init();
 		
@@ -30,6 +30,6 @@ public class App {
 			e.getMessage();
 		}
 				
-	}
+	}*/
 	
 }
