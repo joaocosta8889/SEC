@@ -24,8 +24,6 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	
 	private HashMap<PublicKey, Block> blocks = new HashMap<PublicKey, Block>();
 	
-	//private ArrayList<X509Certificate> certificates = new ArrayList<X509Certificate>();
-
 	public static void main(String[] args) throws RemoteException {
 		BlockService bs = new BlockServer();  
 		Registry reg = LocateRegistry.createRegistry(8081);
@@ -61,7 +59,7 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	}
 	
 	@Override
-	public PublicKey put_k(Data data, byte[] signature, PublicKey id) throws RemoteException, SignatureException, InvalidKeyException, NoSuchAlgorithmException{
+	public void put_k(Data data, byte[] signature, PublicKey id) throws RemoteException, SignatureException, InvalidKeyException, NoSuchAlgorithmException{
 
 		if(verifySignature(data.getDataContent(), signature, id)) {	
 
@@ -73,13 +71,6 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 		} else {
 			throw new SignatureException("Security ERROR: invalid signature, authentication failed!");
 		}
-		
-		return id;
-	}
-	
-	@Override
-	public byte[] put_h(Data data) throws RemoteException, NoSuchAlgorithmException {
-		return null;
 	}
 	
 	
@@ -110,7 +101,7 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	}
 	
 	private boolean verifySignature(byte[] data, byte[] signature, PublicKey public_key) throws SignatureException, NoSuchAlgorithmException, InvalidKeyException {
-		Signature sig = Signature.getInstance("MD5WithRSA");
+		Signature sig = Signature.getInstance("SHA1WithRSA");
         sig.initVerify(public_key);
         sig.update(data);
         boolean result = sig.verify(signature);
@@ -118,14 +109,5 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
         return result;
 	}
 	
-	private byte[] generateId(PublicKey public_key) throws NoSuchAlgorithmException {
-		byte[] keyBytes = public_key.getEncoded();
-		MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-		messageDigest.update(keyBytes);
-		byte[] new_id = messageDigest.digest();
-		
-		return new_id;
-	}
-
 
 }

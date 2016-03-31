@@ -37,32 +37,26 @@ import static javax.xml.bind.DatatypeConverter.printHexBinary;
 public class FSLibrary {
 
 	private BlockService block_service;
-	private Cipher cipher;
-	private KeyPair keys;
 	
-	public PublicKey getId(){
-		return keys.getPublic();
-	}
-	
+
 	public void FS_init() throws NoSuchAlgorithmException, MalformedURLException, NotBoundException, RemoteException, CertificateException, PteidException {	
 		
 		this.block_service =  (BlockService) Naming.lookup("//localhost:8081/FS"); 
-		init_pteid();
 		
-		X509Certificate certificate = getCertificate(getCertificateBytes(0));
-		block_service.storePubKey(certificate);
+		init_pteid();
+		X509Certificate cert = getCertificate(getCertificateBytes(0));
+		block_service.storePubKey(cert);
 	}
 	
-	public void FS_write(int pos, int syze, byte[] contents) throws InvalidKeyException, RemoteException, SignatureException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, CertificateException {
+	public PublicKey FS_write(int pos, int syze, byte[] contents) throws InvalidKeyException, RemoteException, SignatureException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, CertificateException {
 		
+		Data cont = new Data(syze, pos, contents);
 		
-		byte[] encoded =  encrypt(contents);
-		Data cont = new Data(syze, pos, encoded);
+		byte[] signature = makeSignature(contents);
+		X509Certificate cert = getCertificate(getCertificateBytes(0));
+		this.block_service.put_k(contents, signature, cert.getPublicKey());
 		
-		keys = generateKeys();
-		byte[] signature = makeSignature(encoded, keys.getPrivate());
-		X509Certificate certificate = getCertificate(getCertificateBytes(0));
-		this.block_service.put_k(cont, signature, certificate.getPublicKey());
+		return cert.getPublicKey();
 		
 	}
 	
@@ -71,12 +65,11 @@ public class FSLibrary {
 		Data cont = new Data(nbytes, pos);
 		
 		byte[] bytes_read = block_service.get(pk);
-		byte[] decoded = decrypt(bytes_read);
 		
 		// filtra conteudo
 		byte[] out = new byte[pos+nbytes];
 		for(int i=pos, j= 0; i < (pos + nbytes); i++, j++){
-			out[j] = decoded[i];
+			out[j] = bytes_read[i];
 		}
 				 
 		return out;	
@@ -85,49 +78,8 @@ public class FSLibrary {
 	public List<PublicKey> FS_list() throws RemoteException {
 		return block_service.readPubKeys();	
 	}
-
-	private KeyPair generateKeys() throws NoSuchAlgorithmException {
-		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-		keyGen.initialize(1024);
-		KeyPair key_pair = keyGen.generateKeyPair();
-		
-		return key_pair;
-	}
-
-	private byte[] generateId() throws NoSuchAlgorithmException {
-		byte[] keyBytes = this.keys.getPublic().getEncoded();
-		MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-		messageDigest.update(keyBytes);
-		byte[] new_id = messageDigest.digest();
-		
-		return new_id;
-	}
 	
-	private byte[] makeSignature(byte[] data, PrivateKey private_key) throws SignatureException, InvalidKeyException, NoSuchAlgorithmException {
-		 Signature sig = Signature.getInstance("MD5WithRSA");
-	     sig.initSign(private_key);
-	     sig.update(data);
-	     byte[] new_signature = sig.sign();
-	     
-	     return new_signature;
-	}
-	
-	private byte[] encrypt(byte[] data) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
-		this.cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        this.cipher.init(Cipher.ENCRYPT_MODE, this.keys.getPrivate());
-        byte[] encoded_bytes =  this.cipher.doFinal(data);
-        
-        return encoded_bytes;
-	}
-	
-	private byte[] decrypt(byte[] encrypted_data) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-		this.cipher.init(Cipher.DECRYPT_MODE, keys.getPublic());
-        byte[] decoded_bytes = this.cipher.doFinal(encrypted_data); 
-        
-        return decoded_bytes;
-	}
-	
-	private static void init_pteid() throws PteidException {
+	private void init_pteid() throws PteidException {
 		System.loadLibrary("pteidlibj");
 		pteid.Init("");
 		pteid.SetSODChecking(false);
@@ -154,6 +106,53 @@ public class FSLibrary {
 		}
 		
 		return certificate_bytes;
+	}
+	
+	private static byte[] makeSignature(byte[] data) throws PKCS11Exception, ClassNotFoundException, NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		
+    	PKCS11 pkcs11 = null;
+    	String osName = System.getProperty("os.name");
+    	String libName = "libpteidpkcs11.so";
+    	String javaVersion = System.getProperty("java.version");
+    	
+    	 if (-1 != osName.indexOf("Windows"))
+             libName = "pteidpkcs11.dll";
+         else if (-1 != osName.indexOf("Mac"))
+             libName = "pteidpkcs11.dylib";
+         Class<?> pkcs11Class = Class.forName("sun.security.pkcs11.wrapper.PKCS11");
+         if (javaVersion.startsWith("1.5."))
+         {
+             Method getInstanceMethode = pkcs11Class.getDeclaredMethod("getInstance", new Class[] { String.class, CK_C_INITIALIZE_ARGS.class, boolean.class });
+             pkcs11 = (PKCS11)getInstanceMethode.invoke(null, new Object[] { libName, null, false });
+         }
+         else
+         {
+             Method getInstanceMethode = pkcs11Class.getDeclaredMethod("getInstance", new Class[] { String.class, String.class, CK_C_INITIALIZE_ARGS.class, boolean.class });
+             pkcs11 = (PKCS11)getInstanceMethode.invoke(null, new Object[] { libName, "C_GetFunctionList", null, false });
+         }
+
+    	
+		long p11_session = pkcs11.C_OpenSession(0, PKCS11Constants.CKF_SERIAL_SESSION, null, null);        //Open the PKCS11 session
+		
+		pkcs11.C_Login(p11_session, 1, null);							//Token login							
+        
+        CK_ATTRIBUTE[] attributes = new CK_ATTRIBUTE[1];						//Get available keys
+        attributes[0] = new CK_ATTRIBUTE();
+        attributes[0].type = PKCS11Constants.CKA_CLASS;
+        attributes[0].pValue = new Long(PKCS11Constants.CKO_PRIVATE_KEY);
+        pkcs11.C_FindObjectsInit(p11_session, attributes);
+        long[] keyHandles = pkcs11.C_FindObjects(p11_session, 5);
+        long signatureKey = keyHandles[0];			
+        pkcs11.C_FindObjectsFinal(p11_session);
+        
+        CK_MECHANISM mechanism = new CK_MECHANISM();					//Initialize signature
+        mechanism.mechanism = PKCS11Constants.CKM_SHA1_RSA_PKCS;
+        mechanism.pParameter = null;
+        pkcs11.C_SignInit(p11_session, mechanism, signatureKey);
+        
+        byte[] signature = pkcs11.C_Sign(p11_session, data); 			//Sign
+		
+	    return signature;
 	}
 	
 }
