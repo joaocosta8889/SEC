@@ -1,7 +1,5 @@
 package fs;
 
-import java.security.PublicKey;
-
 public class Block {
 	
 	private byte[] content;

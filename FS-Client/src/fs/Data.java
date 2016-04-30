@@ -3,10 +3,10 @@ package fs;
 import java.io.Serializable;
 
 public class Data implements Serializable {
-     
+    
 	private static final long serialVersionUID = 1L;
-	
-	private int dataSize;
+     
+    private int dataSize;
     private int pos;
     private byte[] content;
 
@@ -15,13 +15,14 @@ public class Data implements Serializable {
         this.pos = pos;
         this.content = cont;
     }
+
     
     public Data(int dataSize, int pos) {
         this.dataSize = dataSize;
         this.pos = pos;
         this.content = null;
     }
-
+    
     public int getDataSize() {
         return dataSize;
     }

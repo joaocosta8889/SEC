@@ -8,20 +8,17 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-
-import static javax.xml.bind.DatatypeConverter.printHexBinary;
 
 public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	
 	private static final long serialVersionUID = 1L;
 	
 	private HashMap<PublicKey, Block> blocks = new HashMap<PublicKey, Block>();
-	private List<X509Certificate> certificates = new ArrayList<X509Certificate>();
+	private List<PublicKey> keys = new ArrayList<PublicKey>();
 
 	public static void main(String[] args) throws RemoteException {
 		BlockService bs = new BlockServer();  
@@ -74,10 +71,10 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	}
 	
 	@Override
-	public boolean storePubKey(X509Certificate cert) throws RemoteException {
+	public boolean storePubKey(PublicKey pubkey) throws RemoteException {
 
-		if(!certificates.contains(cert)) {
-			this.certificates.add(cert);
+		if(!keys.contains(pubkey)) {
+			this.keys.add(pubkey);
 			return true;
 		}
 
@@ -86,12 +83,6 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 
 	@Override
 	public List<PublicKey> readPubKeys() throws RemoteException {
-		
-		List<PublicKey> keys = new ArrayList<PublicKey>();
-		
-		for(X509Certificate cert : certificates){
-			keys.add(cert.getPublicKey());
-		}
 		
 		return keys;
 	}
