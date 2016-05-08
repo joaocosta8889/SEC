@@ -20,17 +20,12 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 	private HashMap<PublicKey, Block> blocks = new HashMap<PublicKey, Block>();
 	private List<PublicKey> keys = new ArrayList<PublicKey>();
 
-	public static void main(String[] args) throws RemoteException {
-		BlockService bs = new BlockServer();  
-		Registry reg = LocateRegistry.createRegistry(8081);
-		reg.rebind("FS", bs);	
-		
-		System.out.println("Running...");     
-	}	
 	
-	protected BlockServer() throws RemoteException {
-		super();
-		// TODO Auto-generated constructor stub
+	protected BlockServer(int port) throws RemoteException {
+		Registry reg = LocateRegistry.createRegistry(port);
+		reg.rebind("FS", this);	
+		
+		System.out.println("Running " + port + " ...");   
 	}
 	
 	@Override
@@ -79,7 +74,7 @@ public class BlockServer  extends UnicastRemoteObject implements BlockService {
 		}
 
 		return false;
-	}
+	} 
 
 	@Override
 	public List<PublicKey> readPubKeys() throws RemoteException {
