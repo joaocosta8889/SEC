@@ -17,6 +17,9 @@ import java.util.List;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 
+import quorum.Block;
+import quorum.BlockService;
+
 public class FrontEnd {
 
 	// PARA UM SERVER
@@ -90,19 +93,33 @@ public class FrontEnd {
 //		block_service.put_k(dataĈontent, signature, publicKey);
 	}
 	
-	public byte[] get(PublicKey id) throws RemoteException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IllegalArgumentException, NoSuchAlgorithmException, SignatureException {
+	public byte[] get(PublicKey id, boolean readTime) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException {  
 		
-		ArrayList<byte[]> listResponses = new ArrayList<byte[]>();
+		int f = 0; //number of faults
 		
-		for(int i = 0; i < NR_FAULTS; i++)
-			listResponses.add(block_service[i].get(id));
-		
-		// PROTOCOLO
-		// alterar return debaixo
-		return listResponses.get(0);
-		
-		// PARA UM SERVER
-//		return block_service.get(id);
+		//read from each server replica 
+		ArrayList<Block> readList = new ArrayList<Block>();
+		for(BlockService server : servers) {
+			Block block = server.get(id);
+			if(block != null) {
+				if(verifySignature(block.getAuthData(), block.getSignature(), id)) {
+					readList.add(block);				
+				} else
+					f++;
+			} else 
+				f++;
+		}
+
+		//choose the freshest reply
+		if(f < (N+f)/2) {
+			if(readTime) {
+				return getMaxTime(readList);
+			}
+			return getMaxVal(readList);
+		} else {
+			System.out.println("ERROR 503: service unavailable");
+			return null;
+		}	
 	}
 	
 	public List<PublicKey> readPubKeys() throws RemoteException {

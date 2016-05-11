@@ -41,10 +41,10 @@ public class FSLibrary {
 		System.out.println("[ Writing Complete ]");
 		
 	}
-	
+
 	public byte[] FS_read(PublicKey id, int pos, int nbytes) throws RemoteException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IllegalArgumentException, NoSuchAlgorithmException, SignatureException {
 		
-		byte[] bytes_read = frontEnd.get(id);
+		byte[] bytes_read = frontEnd.get(id, false);
 		
 		byte[] out = new byte[pos+nbytes];
 		for(int i=pos, j= 0; i < (pos + nbytes); i++, j++){
