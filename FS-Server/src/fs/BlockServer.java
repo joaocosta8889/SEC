@@ -1,94 +1,83 @@
 package fs;
 
+import java.net.MalformedURLException;
+import java.rmi.Naming;
 import java.rmi.RemoteException;
-import java.rmi.registry.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
+public class BlockServer extends UnicastRemoteObject implements BlockService {
 
-public class BlockServer  extends UnicastRemoteObject implements BlockService {
-	
 	private static final long serialVersionUID = 1L;
 	
 	private HashMap<PublicKey, Block> blocks = new HashMap<PublicKey, Block>();
-	private List<PublicKey> keys = new ArrayList<PublicKey>();
-
+	private int port;
+	private boolean crashed = false;
+	private boolean hasFault = false; //byzantine fault
 	
-	protected BlockServer(int port) throws RemoteException {
-		Registry reg = LocateRegistry.createRegistry(port);
-		reg.rebind("FS", this);	
+	protected BlockServer(int port, boolean crashed) throws RemoteException, MalformedURLException {
+		super();
+		this.port = port;
+		LocateRegistry.createRegistry(port);
+		Naming.rebind("//localhost:" + port + "/FS", this);
 		
-		System.out.println("Running " + port + " ...");   
+		this.crashed = crashed;
+		if(crashed) {
+			System.out.println("[Server " + port + "] Not Functioning!");
+		} else {
+			System.out.println("[Server " + port + "] Running...");
+		}	
+	}
+
+	public static void main(String[] args) throws NumberFormatException, RemoteException, MalformedURLException {
+		int N = 3; //replicas
+		for(int i=0, port=8080; i<N; port++, i++) {
+			if(i == 2)
+				new BlockServer(port, true);
+			else
+				new BlockServer(port, false);
+		}
+		
 	}
 	
+	public int getPort() {
+		return port;
+	}
+
 	@Override
-	public byte[] get(PublicKey id) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
-		
+	public Block get(PublicKey id) throws RemoteException {	
+		if(crashed) {
+			return null;
+		}
 		if(blocks.containsKey(id)) {
-			byte[] data = blocks.get(id).getBlockContent();
-			byte[] signature = blocks.get(id).getSignature();	
-					
-			boolean signed = verifySignature(data, signature, id);
-			if(signed) {
-				return data;
-			} else {
-				throw new SignatureException("Security ERROR: integrity problem, data is corrupted!");
-			}
+			Block block = blocks.get(id);
+			return block;
 		} else {
 			throw new IllegalArgumentException("SERVER ERROR: Invalid ID");
 		}
 	}
-	
-	@Override
-	public void put_k(Data data, byte[] signature, PublicKey id) throws RemoteException, SignatureException, InvalidKeyException, NoSuchAlgorithmException{
 
-		boolean signed = verifySignature(data.getDataContent(), signature, id);
-		
-		if(signed) {
-			
-			if(blocks.containsKey(id)) {
-				blocks.get(id).setBlockContent(data, signature);
-			} else {
-				Block new_block = new Block();
-				blocks.put(id, new_block);
-				blocks.get(id).setBlockContent(data, signature);
-			}
+	@Override
+	public boolean put_k(Data data, int timestamp, byte[] signature, PublicKey id) throws RemoteException {
+		if(crashed) {
+			return false;
+		}
+		if(blocks.containsKey(id)) {
+				blocks.get(id).setContent(data);
+				blocks.get(id).setTimestamp(timestamp);
+				blocks.get(id).setSignature(signature);
 		} else {
-			throw new SignatureException("[ Security ERROR: Authentication Failed! ]");
-		}
-	}
-	
-	@Override
-	public boolean storePubKey(PublicKey pubkey) throws RemoteException {
-
-		if(!keys.contains(pubkey)) {
-			this.keys.add(pubkey);
-			return true;
-		}
-
-		return false;
-	} 
-
-	@Override
-	public List<PublicKey> readPubKeys() throws RemoteException {
+			Block new_block = new Block(data, timestamp, signature);
+			blocks.put(id, new_block);
+		}	
 		
-		return keys;
+		System.out.println("[Server " + port + "] Content: " + 
+				new String(blocks.get(id).getContent()) + " Time: " + blocks.get(id).getTimestamp());
+		
+		return true;
 	}
 	
-	private boolean verifySignature(byte[] data, byte[] signature, PublicKey public_key) throws SignatureException, NoSuchAlgorithmException, InvalidKeyException {
-		Signature sig = Signature.getInstance("SHA1withRSA");
-        sig.initVerify(public_key);
-        sig.update(data);
-        boolean result = sig.verify(signature);
-        
-        return result;
-	}
-
 }

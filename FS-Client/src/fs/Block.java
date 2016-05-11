@@ -15,6 +15,7 @@ public class Block {
 	}
 	
 	public Block() {
+		
 		byte[] nullCont = new byte[0];
 		this.content = nullCont;
 		this.signature = null;

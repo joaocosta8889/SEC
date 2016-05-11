@@ -3,35 +3,34 @@ package fs;
 import java.io.Serializable;
 
 public class Data implements Serializable {
-    
-	private static final long serialVersionUID = 1L;
      
-    private int dataSize;
+	private static final long serialVersionUID = 1L;
+	
+	private int size;
     private int pos;
     private byte[] content;
 
-    public Data(int dataSize, int pos, byte[] cont) {
-        this.dataSize = dataSize;
+    public Data(int size, int pos, byte[] cont) {
+        this.size = size;
         this.pos = pos;
         this.content = cont;
     }
-
     
-    public Data(int dataSize, int pos) {
-        this.dataSize = dataSize;
+    public Data(int size, int pos) {
+        this.size = size;
         this.pos = pos;
         this.content = null;
     }
-    
-    public int getDataSize() {
-        return dataSize;
+
+    public int getSize() {
+        return size;
     }
 
-    public int getDataPos() {
+    public int getPos() {
         return pos;
     }
 
-    public byte[] getDataContent() {
+    public byte[] getContent() {
         return content;
     }
 }

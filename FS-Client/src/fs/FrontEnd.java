@@ -2,13 +2,17 @@ package fs;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
+import java.nio.ByteBuffer;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -17,84 +21,31 @@ import java.util.List;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 
-import quorum.Block;
-import quorum.BlockService;
-
 public class FrontEnd {
-
-	// PARA UM SERVER
-//	private BlockService block_service;
-	private BlockService[] block_service;
-	private KeyPair user_keys; 
 	
-	private static final int NR_FAULTS = 3;
+	private PublicKey id;
+	private KeyPair keys;
+	private ArrayList<BlockService> servers = new ArrayList<BlockService>();
+	private boolean hasWrote;
 	
-	public FrontEnd(KeyPair user_keys) {
-		block_service = new BlockService[NR_FAULTS];
-		
-		try {
+	private static final int N = 3; //number of replicas
 	
+	public FrontEnd(String[] ports) throws MalformedURLException, RemoteException, NotBoundException, NoSuchAlgorithmException {
+		this.keys = generateKeys();
+		this.id = keys.getPublic();
 		
-			String localhost = "//localhost";
-			for(int i = 0, j=8081; i < NR_FAULTS; i++, j++){
-				String lookUpForServer = localhost.concat(":" + j + "/FS"); 
-				block_service[i] =  (BlockService) Naming.lookup(lookUpForServer); 
-			}
-			
-			// PARA UM SERVER
-//			block_service =  (BlockService) Naming.lookup("//localhost:8081/FS"); 
-			
-			
-			boolean ack[] = {false, false, false};
-			int out = 0;
-			
-			// PROTOCOLO
-			// protocolo aqui tambem no caso de receber menos de tres ack
-			while(out < NR_FAULTS){
-				
-				for(int i = 0; i < NR_FAULTS; i++)
-					ack[i] = block_service[i].storePubKey(user_keys.getPublic());
-
-			
-				for(int i = 0; i < NR_FAULTS; i++){
-					if (ack[i])
-						out++;
-				}
-			}
-			
-			// PARA UM SERVER
-//			boolean ack = block_service.storePubKey(user_keys.getPublic());
-			
-			
-			} catch (RemoteException | MalformedURLException | NotBoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		
-		// PROTOCOLO
-		// se ja recebeu nr suficiente de ack
-		// alterar if debaixo
-		if(true) {
-			System.out.println("Welcome new client!");
-			System.out.println("Your public key is now stored at the server, and available to every reader.");
-		} 
-			
-		System.out.println("[ Inicialization Complete! ]");	
-	}
-
-	
-	public void put_k(Data dataĈontent, byte[] signature, PublicKey publicKey) throws RemoteException, CertificateException, InvalidKeyException, NoSuchAlgorithmException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchMethodException, SecurityException, SignatureException {
-		
-		
-		for(int i = 0; i < NR_FAULTS; i++)
-			block_service[i].put_k(dataĈontent, signature, publicKey);
-		
-		// PARA UM SERVER
-//		block_service.put_k(dataĈontent, signature, publicKey);
+		//connect to each server
+		for(String port : ports) {
+			BlockService server  = (BlockService) Naming.lookup("//localhost:" + port + "/FS");
+			servers.add(server);
+		}
 	}
 	
-	public byte[] get(PublicKey id, boolean readTime) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException {  
-		
+	public PublicKey getId() {
+		return this.id;
+	}
+	
+	public byte[] get(PublicKey id, int pos, int nbytes, boolean readTime) throws InvalidKeyException, RemoteException, IllegalArgumentException, SignatureException, NoSuchAlgorithmException {  
 		int f = 0; //number of faults
 		
 		//read from each server replica 
@@ -110,30 +61,114 @@ public class FrontEnd {
 				f++;
 		}
 
-		//choose the freshest reply
 		if(f < (N+f)/2) {
 			if(readTime) {
+				//reads the most recent timestamp
 				return getMaxTime(readList);
 			}
-			return getMaxVal(readList);
+			//reads the freshest value
+			byte[] bytes_read = getMaxVal(readList);
+			byte[] out = new byte[pos+nbytes];
+			for(int i=pos, j= 0; i < (pos + nbytes); i++, j++){
+				out[j] = bytes_read[i];
+			}
+			
+			return out;  
 		} else {
 			System.out.println("ERROR 503: service unavailable");
 			return null;
 		}	
 	}
 	
-	public List<PublicKey> readPubKeys() throws RemoteException {
+	public void put_k(byte[] content, int pos, int size) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException  {
 		
-		ArrayList<List<PublicKey>> keys = new ArrayList<List<PublicKey>>();
+		int f = 0; //number of faults
 		
-		for(int i = 0; i < NR_FAULTS; i++)
-			keys.add(block_service[i].readPubKeys());
+		//get the most recent timestamp 
+		int timestamp = 0;
+		if(hasWrote) {
+			timestamp = ByteBuffer.wrap(this.get(id, 0, 0, true)).getInt();
+		}
 		
-		// PROTOCOLO
-		// alterar return debaixo
-		return keys.get(0);
-		
-		// PARA UM SERVER
-//		return  block_service.readPubKeys();
+		//write to each server replica
+		Data data = new Data(size, pos, content);
+        for(BlockService server : servers) {
+        	byte[] auth_data = makeAuthData(content, timestamp);
+        	byte[] signature = makeSignature(auth_data, this.keys.getPrivate());
+        	Boolean ack = server.put_k(data, timestamp, signature, id);
+        	if(ack) 
+        		timestamp++;
+        	else 
+        		f++;   
+        }
+        
+        if(f > (N+f)/2) {
+        	System.out.println("WARNING: Writing may be incomplete");
+        }
+        
+        this.hasWrote = true;
 	}
+	
+	private KeyPair generateKeys() throws NoSuchAlgorithmException {
+		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+		keyGen.initialize(1024);
+		KeyPair key_pair = keyGen.generateKeyPair();
+		
+		return key_pair;
+	}
+	
+	private byte[] makeSignature(byte[] data, PrivateKey private_key) throws SignatureException, InvalidKeyException, NoSuchAlgorithmException {
+		 Signature sig = Signature.getInstance("Sha1WithRSA");
+	     sig.initSign(private_key);
+	     sig.update(data);
+	     byte[] new_signature = sig.sign();
+	     
+	     return new_signature;
+	}
+	
+	private boolean verifySignature(byte[] data, byte[] signature, PublicKey public_key) throws SignatureException, NoSuchAlgorithmException, InvalidKeyException {
+		Signature sig = Signature.getInstance("SHA1withRSA");
+       sig.initVerify(public_key);
+       sig.update(data);
+       boolean result = sig.verify(signature);
+       
+       return result;
+	}
+	
+	private byte[] makeAuthData(byte[] content, int timestamp) {
+		//convert timestamp into byte[]
+		byte[] timeByte = ByteBuffer.allocate(4).putInt(timestamp).array();
+		
+		//append content with timestamp
+		byte[] auth_data = new byte[content.length + timeByte.length];
+		System.arraycopy(content, 0, auth_data, 0, content.length);
+		System.arraycopy(timeByte, 0, auth_data, content.length, timeByte.length);
+				
+	    return auth_data;	
+	}
+	
+	private byte[] getMaxVal(ArrayList<Block> list) {
+		byte[] max_val = null;
+		int max_time = 0;
+		for(Block b : list) {
+			if(b.getTimestamp() > max_time) {
+				max_time = b.getTimestamp();
+				max_val = b.getContent();
+			}
+		}	
+		return max_val;
+	}
+	
+	private byte[] getMaxTime(ArrayList<Block> list) {
+		int max_time = 0;
+		for(Block b : list) {
+			if(b.getTimestamp() > max_time) {
+				max_time = b.getTimestamp();
+			}
+		}	
+		
+		return ByteBuffer.allocate(4).putInt(max_time).array();
+	}
+	
+	
 }
