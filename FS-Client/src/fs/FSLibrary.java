@@ -20,7 +20,7 @@ public class FSLibrary {
 	public void FS_write(String text, int pos, int size){
 		try {
 			
-			front_end.put_k(text.getBytes(), pos, size);
+			front_end.write(text.getBytes(), pos, size);
 			
 		} catch (InvalidKeyException | SignatureException | NoSuchAlgorithmException | RemoteException e) {
 			e.getMessage();
@@ -30,7 +30,7 @@ public class FSLibrary {
 	public String FS_read(PublicKey id, int pos, int nbytes){  
 		try {
 			
-			byte[] text_bytes = front_end.get(id, pos, nbytes, false);
+			byte[] text_bytes = front_end.read(id, pos, nbytes, false);
 			return new String(text_bytes);
 			
 		} catch (InvalidKeyException | RemoteException | IllegalArgumentException | SignatureException

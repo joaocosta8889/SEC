@@ -1,6 +1,5 @@
 package fs;
 
-import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.rmi.Naming;
@@ -14,12 +13,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.List;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
 
 public class FrontEnd {
 	
@@ -45,7 +40,7 @@ public class FrontEnd {
 		return this.id;
 	}
 	
-	public byte[] get(PublicKey id, int pos, int nbytes, boolean readTime) throws InvalidKeyException, RemoteException, IllegalArgumentException, SignatureException, NoSuchAlgorithmException {  
+	public byte[] read(PublicKey id, int pos, int nbytes, boolean readTime) throws InvalidKeyException, RemoteException, IllegalArgumentException, SignatureException, NoSuchAlgorithmException {  
 		int f = 0; //number of faults
 		
 		//read from each server replica 
@@ -80,14 +75,14 @@ public class FrontEnd {
 		}	
 	}
 	
-	public void put_k(byte[] content, int pos, int size) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException  {
+	public void write(byte[] content, int pos, int size) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException  {
 		
 		int f = 0; //number of faults
 		
 		//get the most recent timestamp 
 		int timestamp = 0;
 		if(hasWrote) {
-			timestamp = ByteBuffer.wrap(this.get(id, 0, 0, true)).getInt();
+			timestamp = ByteBuffer.wrap(this.read(id, 0, 0, true)).getInt();
 		}
 		
 		//write to each server replica

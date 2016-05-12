@@ -1,23 +1,44 @@
 package fs;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-public class Block {
+public class Block implements Serializable{
+
+	private static final long serialVersionUID = 1L;
 	
 	private byte[] content;
 	private int timestamp;
 	private byte[] signature;
 	
-	public Block(Data data, int timestamp, byte[] signature) {
-		this.content = writeBlock(data);
+	public Block(int timestamp, byte[] signature) {
+		this.content = new byte[0];
 		this.timestamp = timestamp;
 		this.signature = signature;
 	}
 	
-	public Block() {
-		byte[] nullCont = new byte[0];
-		this.content = nullCont;
-		this.signature = null;
+	public byte[] getContent() {
+		return content;
+	}
+	
+	public void setContent(Data data) {
+		this.content = writeBlock(data);
+	}
+	
+	public int getTimestamp() {
+		return timestamp;
+	}
+
+	public void setTimestamp(int timestamp) {
+		this.timestamp = timestamp;
+	}
+
+	public byte[] getSignature() {
+		return signature;
+	}
+
+	public void setSignature(byte[] signature) {
+		this.signature = signature;
 	}
 	
 	private byte[] writeBlock(Data cont){
@@ -64,29 +85,6 @@ public class Block {
 	}
 
 	
-	public byte[] getContent() {
-		return content;
-	}
-	
-	public void setContent(Data data) {
-		this.content = writeBlock(data);
-	}
-	
-	public int getTimestamp() {
-		return timestamp;
-	}
-
-	public void setTimestamp(int timestamp) {
-		this.timestamp = timestamp;
-	}
-
-	public byte[] getSignature() {
-		return signature;
-	}
-
-	public void setSignature(byte[] signature) {
-		this.signature = signature;
-	}
 }
 
 

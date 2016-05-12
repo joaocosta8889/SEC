@@ -35,10 +35,7 @@ public class BlockServer extends UnicastRemoteObject implements BlockService {
 	public static void main(String[] args) throws NumberFormatException, RemoteException, MalformedURLException {
 		int N = 3; //replicas
 		for(int i=0, port=8080; i<N; port++, i++) {
-			if(i == 2)
-				new BlockServer(port, true);
-			else
-				new BlockServer(port, false);
+			new BlockServer(port, false);
 		}
 		
 	}
@@ -70,7 +67,8 @@ public class BlockServer extends UnicastRemoteObject implements BlockService {
 				blocks.get(id).setTimestamp(timestamp);
 				blocks.get(id).setSignature(signature);
 		} else {
-			Block new_block = new Block(data, timestamp, signature);
+			Block new_block = new Block(timestamp, signature);
+			blocks.get(id).setContent(data);
 			blocks.put(id, new_block);
 		}	
 		
