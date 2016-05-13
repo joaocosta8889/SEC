@@ -2,29 +2,37 @@ package fs;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.security.PublicKey;
 
 public class Block implements Serializable{
-
+	
 	private static final long serialVersionUID = 1L;
 	
+	private PublicKey id;
 	private byte[] content;
 	private int timestamp;
 	private byte[] signature;
 	
-	public Block(int timestamp, byte[] signature) {
+	
+	public Block(byte[] content, int timestamp, byte[] signature, PublicKey id) {
 		this.content = new byte[0];
 		this.timestamp = timestamp;
+		this.id = id; 
 		this.signature = signature;
+	}
+
+	public PublicKey getId() {
+		return id;
 	}
 	
 	public byte[] getContent() {
 		return content;
 	}
-	
+
 	public void setContent(Data data) {
 		this.content = writeBlock(data);
 	}
-	
+
 	public int getTimestamp() {
 		return timestamp;
 	}
@@ -32,7 +40,7 @@ public class Block implements Serializable{
 	public void setTimestamp(int timestamp) {
 		this.timestamp = timestamp;
 	}
-
+	
 	public byte[] getSignature() {
 		return signature;
 	}
@@ -72,7 +80,7 @@ public class Block implements Serializable{
 		}
 		return newContent;
 	}
-	
+
 	public byte[] getAuthData() {
 		//convert timestamp into byte[]
 		byte[] timeByte = ByteBuffer.allocate(4).putInt(timestamp).array();
@@ -83,8 +91,5 @@ public class Block implements Serializable{
 		
 		return auth_data;	
 	}
-
 	
 }
-
-

@@ -1,3 +1,4 @@
+
 package fs;
 
 import java.io.Serializable;
@@ -10,7 +11,7 @@ public class Data implements Serializable {
     private int pos;
     private byte[] content;
 
-    public Data(int size, int pos, byte[] cont) {
+    public Data(byte[] cont, int pos, int size) {
         this.size = size;
         this.pos = pos;
         this.content = cont;

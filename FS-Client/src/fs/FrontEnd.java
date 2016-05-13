@@ -1,37 +1,55 @@
 package fs;
 
-import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 
 public class FrontEnd {
 	
 	private PublicKey id;
 	private KeyPair keys;
+	private SecretKey secret;
 	private ArrayList<BlockService> servers = new ArrayList<BlockService>();
-	private boolean hasWrote;
+	boolean hasWrote;
 	
-	private static final int N = 3; //number of replicas
+	private int f; //number of tolerated faults
+	private int N; //number of replicas
 	
-	public FrontEnd(String[] ports) throws MalformedURLException, RemoteException, NotBoundException, NoSuchAlgorithmException {
+	public FrontEnd(int faults) throws Exception {
+		this.f = faults;
+		this.N = 3*f + 1;
+		
+		//generate client's keys
 		this.keys = generateKeys();
 		this.id = keys.getPublic();
+		this.secret = generateSecret();
+		this.hasWrote = false;
 		
 		//connect to each server
-		for(String port : ports) {
+		for(int i=0, port=8080; i<N; port++, i++) {
 			BlockService server  = (BlockService) Naming.lookup("//localhost:" + port + "/FS");
+			server.register(id, secret);
 			servers.add(server);
 		}
 	}
@@ -41,66 +59,85 @@ public class FrontEnd {
 	}
 	
 	public byte[] read(PublicKey id, int pos, int nbytes, boolean readTime) throws InvalidKeyException, RemoteException, IllegalArgumentException, SignatureException, NoSuchAlgorithmException {  
-		int f = 0; //number of faults
-		
-		//read from each server replica 
-		ArrayList<Block> readList = new ArrayList<Block>();
+		ArrayList<Future<Block>> replies = new ArrayList<Future<Block>>();
+		ExecutorService exe = Executors.newCachedThreadPool();
 		for(BlockService server : servers) {
-			Block block = server.get(id);
-			if(block != null) {
-				if(verifySignature(block.getAuthData(), block.getSignature(), id)) {
-					readList.add(block);				
-				} else
-					f++;
-			} else 
-				f++;
+			ServerRequest request = new ServerRequest(server, id);
+			replies.add(exe.submit(request));
 		}
-
-		if(f < (N+f)/2) {
-			if(readTime) {
-				//reads the most recent timestamp
-				return getMaxTime(readList);
+		
+		ArrayList<Block> blocks = new ArrayList<Block>();
+		for(Future<Block> reply : replies) {
+			try {		
+				blocks.add(reply.get(2, TimeUnit.SECONDS));
+			} catch (InterruptedException | ExecutionException e) {						
+				e.printStackTrace();
+			} catch (TimeoutException e) {
+				//ignore
 			}
+		}
+		exe.shutdown();
+		
+		int ackList = 0;
+		ArrayList<Block> clean_blocks = new ArrayList<Block>();
+		for(Block block : blocks) {
+			if(verifySignature(block.getAuthData(), block.getSignature(), id)) {
+				ackList++;
+				clean_blocks.add(block);
+			}
+		}
+		
+		if(ackList > (N+f)/2) {
+			if(readTime)
+				//reads the most recent timestamp
+				return getMaxTime(clean_blocks);
 			//reads the freshest value
-			byte[] bytes_read = getMaxVal(readList);
-			byte[] out = new byte[pos+nbytes];
+			byte[] bytes_read = getMaxVal(clean_blocks);
+			byte[] val = new byte[pos + nbytes];
 			for(int i=pos, j= 0; i < (pos + nbytes); i++, j++){
-				out[j] = bytes_read[i];
+				val[j] = bytes_read[i];
 			}
 			
-			return out;  
-		} else {
-			System.out.println("ERROR 503: service unavailable");
-			return null;
-		}	
-	}
-	
-	public void write(byte[] content, int pos, int size) throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, RemoteException  {
-		
-		int f = 0; //number of faults
-		
-		//get the most recent timestamp 
-		int timestamp = 0;
-		if(hasWrote) {
-			timestamp = ByteBuffer.wrap(this.read(id, 0, 0, true)).getInt();
+			return val;  
 		}
 		
-		//write to each server replica
-		Data data = new Data(size, pos, content);
-        for(BlockService server : servers) {
-        	byte[] auth_data = makeAuthData(content, timestamp);
-        	byte[] signature = makeSignature(auth_data, this.keys.getPrivate());
-        	Boolean ack = server.put_k(data, timestamp, signature, id);
-        	if(ack) 
-        		timestamp++;
-        	else 
-        		f++;   
-        }
-        
-        if(f > (N+f)/2) {
-        	System.out.println("WARNING: Writing may be incomplete");
-        }
-        
+		throw new RemoteException("ERROR 503: Service Unavailable");	
+	}
+	
+	public void write(byte[] content, int pos, int size) throws Exception  {	
+		int timestamp = 0;
+		if(hasWrote) {
+			timestamp = ByteBuffer.wrap(this.read(this.id, 0, 0, true)).getInt(); 		//get most updated timestamp value
+		}		
+
+		Data data = new Data(content, pos, size);
+		
+		ArrayList<Future<Block>> replies = new ArrayList<Future<Block>>();
+    	ExecutorService exe = Executors.newCachedThreadPool();
+		for(BlockService server : servers) {
+	    	byte[] auth_data = makeAuthData(content, timestamp);
+	    	byte[] signature = makeSignature(auth_data, this.keys.getPrivate());
+	    	byte[] mac = makeMAC(content, secret);
+	    	replies.add(exe.submit(new ServerRequest(server, data, timestamp, signature, this.id, mac)));
+	    	timestamp++;
+	    }
+		
+		int ackList = 0;
+		for(Future<Block> reply : replies) {
+			try {
+				reply.get(2, TimeUnit.SECONDS);
+				ackList++;
+			} catch (InterruptedException | ExecutionException e) {
+				e.printStackTrace();
+			} catch (TimeoutException e) {
+				//ignore
+			}
+		}
+		exe.shutdown();
+		
+		if(ackList <= (N+f)/2) {
+			throw new RemoteException("ERROR 503: Service Unavailable");
+		}	
         this.hasWrote = true;
 	}
 	
@@ -110,6 +147,14 @@ public class FrontEnd {
 		KeyPair key_pair = keyGen.generateKeyPair();
 		
 		return key_pair;
+	}
+	
+	private SecretKey generateSecret() throws Exception {
+        KeyGenerator keyGen = KeyGenerator.getInstance("DES");
+	    keyGen.init(56);
+	    SecretKey key = keyGen.generateKey();
+	
+	    return key;
 	}
 	
 	private byte[] makeSignature(byte[] data, PrivateKey private_key) throws SignatureException, InvalidKeyException, NoSuchAlgorithmException {
@@ -141,6 +186,21 @@ public class FrontEnd {
 				
 	    return auth_data;	
 	}
+	
+	public byte[] makeMAC(byte[] bytes, SecretKey key) throws Exception {
+
+        MessageDigest messageDigest = MessageDigest.getInstance("MD5"); 
+        messageDigest.update(bytes);
+        
+        byte[] digest = messageDigest.digest();
+
+        Cipher cipher = Cipher.getInstance("DES/ECB/PKCS5Padding");
+        
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        byte[] mac = cipher.doFinal(digest);
+
+        return mac;
+    }
 	
 	private byte[] getMaxVal(ArrayList<Block> list) {
 		byte[] max_val = null;
